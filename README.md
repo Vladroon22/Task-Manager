@@ -3,12 +3,6 @@
 <h2>Как запустить</h2>
 
 ```
-make swagger
-```
-
-затем
-
-```
 make compose-run
 ```
 
