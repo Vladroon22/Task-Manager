@@ -20,7 +20,6 @@ CREATE TABLE IF NOT EXISTS tasks (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Таблица переопределений для повторяющихся задач
 CREATE TABLE IF NOT EXISTS task_overrides (
     id SERIAL PRIMARY KEY,
     task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,

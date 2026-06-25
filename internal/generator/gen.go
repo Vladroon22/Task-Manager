@@ -22,7 +22,7 @@ func generateRecurringDates(task models.Task, from, to time.Time) []time.Time {
 	}
 
 	// Защита:
-	maxDates := 20
+	maxDates := 100
 
 	for !current.After(to) && len(dates) < maxDates {
 		var shouldAdd bool

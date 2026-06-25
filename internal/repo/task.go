@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"sort"
 	"strings"
 	"time"
@@ -49,11 +50,16 @@ func (r *TaskRepo) Create(ctx context.Context, task *models.CreateTaskRequest) (
 			id, title, description, due_date, status, created_at, updated_at
 	`
 
+	date, err := time.Parse(time.DateOnly, task.DueDate)
+	if err != nil {
+		return nil, fmt.Errorf("%v", err)
+	}
+
 	var created models.Task
 	if err := tx.QueryRowContext(ctx, query,
 		task.Title,
 		task.Description,
-		task.DueDate.Format(time.DateTime),
+		date.Format(time.RFC3339),
 		status,
 	).Scan(
 		&created.ID,
@@ -170,6 +176,12 @@ func (r *TaskRepo) List(ctx context.Context, filter *models.TaskFilter) ([]model
 			t.description, 
 			t.due_date, 
 			t.status, 
+			
+			t.is_recurring,     
+			t.recurrence_type,
+			t.recurrence_interval, 
+			t.recurrence_days,  
+			
 			t.created_at, 
 			t.updated_at,
 			COALESCE(
@@ -207,13 +219,27 @@ func (r *TaskRepo) List(ctx context.Context, filter *models.TaskFilter) ([]model
 	var tasks []models.Task
 	for rows.Next() {
 		var task models.Task
-		var tagIDs []int
+
+		// Use pointer types for nullable fields
+		var (
+			recurrenceType     *string
+			recurrenceInterval *int
+			recurrenceDays     *[]int
+			tagIDs             []int64 // or []int depending on your DB
+		)
+
 		if err := rows.Scan(
 			&task.ID,
 			&task.Title,
 			&task.Description,
 			&task.DueDate,
 			&task.Status,
+
+			&task.IsRecurring,
+			&recurrenceType,
+			&recurrenceInterval,
+			&recurrenceDays,
+
 			&task.CreatedAt,
 			&task.UpdatedAt,
 			pq.Array(&tagIDs),
@@ -221,10 +247,27 @@ func (r *TaskRepo) List(ctx context.Context, filter *models.TaskFilter) ([]model
 			return nil, fmt.Errorf("failed to scan task: %w", err)
 		}
 
-		// Загружаем теги по ID
-		if len(tagIDs) > 0 {
-			task.Tags = make([]models.Tag, 0, len(tagIDs))
-			for _, tagID := range tagIDs {
+		// Handle nullable recurrence fields
+		if recurrenceType != nil {
+			task.RecurrenceType = recurrenceType
+		}
+		if recurrenceInterval != nil {
+			task.RecurrenceInterval = recurrenceInterval
+		}
+		if recurrenceDays != nil {
+			task.RecurrenceDays = *recurrenceDays
+		}
+
+		// Convert tag IDs from int64 to int if needed
+		intTagIDs := make([]int, len(tagIDs))
+		for i, id := range tagIDs {
+			intTagIDs[i] = int(id)
+		}
+
+		// Load tags by ID
+		if len(intTagIDs) > 0 {
+			task.Tags = make([]models.Tag, 0, len(intTagIDs))
+			for _, tagID := range intTagIDs {
 				tag, err := r.tagRepo.GetTagByID(ctx, tagID)
 				if err == nil {
 					task.Tags = append(task.Tags, *tag)
@@ -241,7 +284,7 @@ func (r *TaskRepo) List(ctx context.Context, filter *models.TaskFilter) ([]model
 		return nil, fmt.Errorf("error iterating tasks: %w", err)
 	}
 
-	// Возвращаем пустой массив вместо null
+	// Return empty slice instead of null
 	if tasks == nil {
 		tasks = []models.Task{}
 	}
@@ -323,7 +366,7 @@ func (r *TaskRepo) Update(ctx context.Context, id int, update *models.UpdateTask
 	// Обновление due_date
 	if update.DueDate != nil {
 		setClauses = append(setClauses, fmt.Sprintf("due_date = $%d", argIdx))
-		args = append(args, update.DueDate.Format(time.DateTime))
+		args = append(args, update.DueDate.Time().Format(time.DateOnly))
 		argIdx++
 	}
 
@@ -363,10 +406,6 @@ func (r *TaskRepo) Update(ctx context.Context, id int, update *models.UpdateTask
 			&row.Description,
 			&row.DueDate,
 			&row.Status,
-			&row.IsRecurring,
-			&row.RecurrenceType,
-			&row.RecurrenceInterval,
-			&row.RecurrenceDays,
 			&row.CreatedAt,
 			&row.UpdatedAt,
 		)
@@ -375,6 +414,7 @@ func (r *TaskRepo) Update(ctx context.Context, id int, update *models.UpdateTask
 			return nil, models.ErrTaskNotFound
 		}
 		if err != nil {
+			log.Println(err)
 			return nil, fmt.Errorf("failed to update task: %w", err)
 		}
 
@@ -411,6 +451,11 @@ func (r *TaskRepo) Delete(ctx context.Context, id int) error {
 ////////// periodicity
 
 func (r *TaskRepo) CreateTaskWithPeriod(ctx context.Context, req *models.CreateTaskPeriodRequest) (*models.Task, error) {
+	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
 
 	status := models.StatusNew
 	if req.Status != "" {
@@ -418,7 +463,7 @@ func (r *TaskRepo) CreateTaskWithPeriod(ctx context.Context, req *models.CreateT
 	}
 
 	var task models.Task
-	var recurrenceDays pq.Int32Array // Используем pq.Int32Array
+	var recurrenceDays pq.Int32Array
 
 	if err := r.db.QueryRowContext(ctx, `
         INSERT INTO tasks (
@@ -444,7 +489,6 @@ func (r *TaskRepo) CreateTaskWithPeriod(ctx context.Context, req *models.CreateT
 		return nil, fmt.Errorf("failed to create task: %w", err)
 	}
 
-	// Конвертируем pq.Int32Array в []int
 	if req.RecurrenceDays != nil {
 		task.RecurrenceDays = make([]int, len(recurrenceDays))
 		for i, d := range recurrenceDays {
@@ -452,7 +496,6 @@ func (r *TaskRepo) CreateTaskWithPeriod(ctx context.Context, req *models.CreateT
 		}
 	}
 
-	// Добавляем теги
 	if len(req.Tags) > 0 {
 		for _, tagName := range req.Tags {
 			r.addTagToTask(ctx, task.ID, tagName)
@@ -460,6 +503,14 @@ func (r *TaskRepo) CreateTaskWithPeriod(ctx context.Context, req *models.CreateT
 	}
 
 	task.Tags, _ = r.tagRepo.GetTaskTags(ctx, task.ID)
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	if err := generator.ValidateRecurrenceRule(*task.RecurrenceType, *task.RecurrenceInterval, task.RecurrenceDays); err != nil {
+		log.Println(err)
+	}
 
 	return &task, nil
 }
@@ -474,22 +525,22 @@ func (r *TaskRepo) GetTasksForPeriod(ctx context.Context, from, to time.Time) ([
 	}
 	tasks = append(tasks, regularTasks...)
 
-	// 2. Получаем повторяющиеся задачи
 	recurringTasks, err := r.getRecurringTasks(ctx, from, to)
 	if err != nil {
 		return nil, err
 	}
 	tasks = append(tasks, recurringTasks...)
 
-	// 3. Сортируем по дате
 	sort.Slice(tasks, func(i, j int) bool {
 		return tasks[i].DueDate.Time().Before(tasks[j].DueDate.Time())
 	})
 
-	// 4. Добавляем теги для каждой задачи
 	for i := range tasks {
 		tags, _ := r.tagRepo.GetTaskTags(ctx, tasks[i].ID)
 		tasks[i].Tags = tags
+		if err := generator.ValidateRecurrenceRule(*tasks[i].RecurrenceType, *tasks[i].RecurrenceInterval, tasks[i].RecurrenceDays); err != nil {
+			log.Println(err)
+		}
 	}
 
 	return tasks, nil
@@ -520,19 +571,18 @@ func (r *TaskRepo) getRegularTasks(ctx context.Context, from, to time.Time) ([]m
 	var tasks []models.Task
 	for rows.Next() {
 		var task models.Task
-		var recurrenceDays []int64 // Изменено на []int64 для pq.Array
+		var recurrenceDays []int
 
 		err := rows.Scan(
 			&task.ID, &task.Title, &task.Description, &task.DueDate, &task.Status,
 			&task.IsRecurring, &task.RecurrenceType, &task.RecurrenceInterval,
-			pq.Array(&recurrenceDays), // Используем pq.Array
+			pq.Array(&recurrenceDays),
 			&task.CreatedAt, &task.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan task: %w", err)
 		}
 
-		// Конвертируем []int64 в []int
 		task.RecurrenceDays = make([]int, len(recurrenceDays))
 		for i, d := range recurrenceDays {
 			task.RecurrenceDays[i] = int(d)
@@ -561,7 +611,7 @@ func (r *TaskRepo) getRecurringTasks(ctx context.Context, from, to time.Time) ([
             is_recurring = TRUE 
         AND 
             due_date <= $1::date
-    `, to) // Исправлено: используем только $1 (to)
+    `, to)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get recurring tasks: %w", err)
@@ -572,42 +622,36 @@ func (r *TaskRepo) getRecurringTasks(ctx context.Context, from, to time.Time) ([
 
 	for rows.Next() {
 		var template models.Task
-		var recurrenceDays []int64 // Изменено на []int64 для pq.Array
+		var recurrenceDays []int
 
 		err := rows.Scan(
 			&template.ID, &template.Title, &template.Description,
 			&template.DueDate, &template.Status,
 			&template.IsRecurring, &template.RecurrenceType,
-			&template.RecurrenceInterval, pq.Array(&recurrenceDays), // Используем pq.Array
+			&template.RecurrenceInterval, pq.Array(&recurrenceDays),
 			&template.CreatedAt, &template.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan recurring task: %w", err)
 		}
 
-		// Конвертируем []int64 в []int
 		template.RecurrenceDays = make([]int, len(recurrenceDays))
 		for i, d := range recurrenceDays {
 			template.RecurrenceDays[i] = int(d)
 		}
 
-		// Генерируем даты повторений
 		dates := generator.GenerateRecurringDates(template, from, to)
 
-		// Получаем переопределения для этого шаблона
 		overrides, err := r.getOverridesForPeriod(ctx, template.ID, from, to)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get overrides for task %d: %w", template.ID, err)
 		}
 
-		// Создаем задачи для каждой даты
 		for _, date := range dates {
 			task := template
 
-			// Устанавливаем новую дату
 			task.DueDate = models.CustomDate(date)
 
-			// Устанавливаем статус на основе переопределений
 			dateKey := date.Format(time.DateOnly)
 			if override, exists := overrides[dateKey]; exists {
 				task.Status = override.Status
@@ -666,16 +710,14 @@ func (r *TaskRepo) getOverridesForPeriod(ctx context.Context, taskID int, from, 
 
 // SetTaskStatus устанавливает статус для конкретной даты повторяющейся задачи
 func (r *TaskRepo) SetTaskStatus(ctx context.Context, taskID int, date time.Time, status models.TaskStatus) error {
-	// Проверяем, что задача существует и она повторяющаяся
 	var isRecurring bool
 	if err := r.db.QueryRowContext(ctx, `SELECT is_recurring FROM tasks WHERE id = $1`, taskID).Scan(&isRecurring); err == sql.ErrNoRows {
-		return fmt.Errorf("task not found")
+		return models.ErrTaskNotFound
 	} else if err != nil {
 		return err
 	}
 
 	if !isRecurring {
-		// Для обычных задач просто обновляем статус
 		_, err := r.db.ExecContext(ctx, `UPDATE tasks SET status = $1, updated_at = NOW() WHERE id = $2`, status, taskID)
 		return err
 	}
@@ -687,7 +729,6 @@ func (r *TaskRepo) SetTaskStatus(ctx context.Context, taskID int, date time.Time
         DO UPDATE SET status = $3
     `
 
-	// Для повторяющихся - создаем/обновляем переопределение
 	_, err := r.db.ExecContext(ctx, query, taskID, date, status)
 
 	return err
@@ -697,33 +738,37 @@ func (r *TaskRepo) SetTaskStatus(ctx context.Context, taskID int, date time.Time
 func (r *TaskRepo) addTagToTask(ctx context.Context, taskID int, tagName string) error {
 	var tagID int
 
-	// Вставляем или получаем тег
-	err := r.db.QueryRowContext(ctx, `
+	if err := r.db.QueryRowContext(ctx, `
         INSERT INTO tags (name) VALUES ($1)
         ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
         RETURNING id
-    `, tagName).Scan(&tagID)
-
-	if err != nil {
+    `, tagName).Scan(&tagID); err != nil {
 		return err
 	}
 
-	// Связываем тег с задачей
-	_, err = r.db.ExecContext(ctx, `
+	if _, err := r.db.ExecContext(ctx, `
         INSERT INTO task_tags (task_id, tag_id) VALUES ($1, $2)
         ON CONFLICT DO NOTHING
-    `, taskID, tagID)
+    `, taskID, tagID); err != nil {
+		return err
+	}
 
-	return err
+	return nil
 }
 
 // GetTaskTags получает теги задачи
 func (r *TaskRepo) GetTaskTags(ctx context.Context, taskID int) ([]string, error) {
 	rows, err := r.db.QueryContext(ctx, `
-        SELECT t.name 
-        FROM tags t
-        JOIN task_tags tt ON t.id = tt.tag_id
-        WHERE tt.task_id = $1
+        SELECT
+			t.name 
+        FROM
+			tags t
+        JOIN 
+			task_tags tt
+		ON 
+			t.id = tt.tag_id
+        WHERE
+			tt.task_id = $1
     `, taskID)
 
 	if err != nil {
@@ -747,8 +792,10 @@ func (r *TaskRepo) GetTaskTags(ctx context.Context, taskID int) ([]string, error
 
 func (r *TaskRepo) DeleteTaskOverride(ctx context.Context, taskID int, date time.Time) error {
 	result, err := r.db.ExecContext(ctx, `
-        DELETE FROM task_overrides 
-        WHERE task_id = $1 AND override_date = $2
+        DELETE FROM
+			task_overrides 
+        WHERE 
+			task_id = $1 AND override_date = $2::date
     `, taskID, date)
 
 	if err != nil {
@@ -761,7 +808,7 @@ func (r *TaskRepo) DeleteTaskOverride(ctx context.Context, taskID int, date time
 	}
 
 	if rowsAffected == 0 {
-		return fmt.Errorf("override not found for task %d on date %s", taskID, date.Format(time.DateOnly))
+		return models.ErrTaskNotFound
 	}
 
 	return nil

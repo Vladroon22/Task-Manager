@@ -41,7 +41,7 @@ type Task struct {
 type CreateTaskRequest struct {
 	Title       string     `json:"title" validate:"required"`
 	Description string     `json:"description,omitempty"`
-	DueDate     time.Time  `json:"due_date" validate:"required"`
+	DueDate     string     `json:"due_date" validate:"required"`
 	Status      TaskStatus `json:"status,omitempty"`
 	Tags        []string   `json:"tags,omitempty"`
 
@@ -54,7 +54,7 @@ type CreateTaskRequest struct {
 type UpdateTaskRequest struct {
 	Title       *string     `json:"title,omitempty"`
 	Description *string     `json:"description,omitempty"`
-	DueDate     *time.Time  `json:"due_date,omitempty"`
+	DueDate     *CustomDate `json:"due_date,omitempty"`
 	Status      *TaskStatus `json:"status,omitempty"`
 }
 

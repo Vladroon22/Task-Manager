@@ -35,7 +35,7 @@ func NewTaskHandler(srv service.TaskServicer) *TaskHandler {
 // @Router       /tasks [post]
 func (h *TaskHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	var req models.CreateTaskRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil { /// <-----
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		log.Printf("Error decoding request: %v", err)
 		respondWithError(w, http.StatusBadRequest, "Invalid request body")
 		return
@@ -43,10 +43,6 @@ func (h *TaskHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 
 	if req.Title == "" {
 		respondWithError(w, http.StatusBadRequest, "Title is required")
-		return
-	}
-	if req.DueDate.IsZero() {
-		respondWithError(w, http.StatusBadRequest, "Due date is required")
 		return
 	}
 
@@ -148,6 +144,7 @@ func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 
 	tasks, err := h.srv.List(r.Context(), filter)
 	if err != nil {
+		log.Println(err)
 		respondWithError(w, http.StatusInternalServerError, "Failed to list tasks")
 		return
 	}
@@ -176,7 +173,8 @@ func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req models.UpdateTaskRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil { // <---
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil { //
+		log.Println(err)
 		respondWithError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
@@ -364,6 +362,10 @@ func (h *TaskHandler) SetTaskStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.srv.SetTaskStatus(r.Context(), id, date, status); err != nil {
+		if err == models.ErrTaskNotFound {
+			respondWithError(w, http.StatusNotFound, err.Error())
+			return
+		}
 		respondWithError(w, http.StatusInternalServerError, err.Error())
 		return
 	}

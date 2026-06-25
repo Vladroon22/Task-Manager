@@ -121,7 +121,6 @@ func (r *TagRepo) ListTags(ctx context.Context) ([]models.Tag, error) {
 		return nil, fmt.Errorf("error iterating tags: %w", err)
 	}
 
-	// Возвращаем пустой массив вместо null
 	if tags == nil {
 		tags = []models.Tag{}
 	}
@@ -130,13 +129,10 @@ func (r *TagRepo) ListTags(ctx context.Context) ([]models.Tag, error) {
 }
 
 func (r *TagRepo) DeleteTag(ctx context.Context, id int) error {
-	// Сначала удаляем все связи с задачами
-	_, err := r.db.ExecContext(ctx, "DELETE FROM task_tags WHERE tag_id = $1", id)
-	if err != nil {
+	if _, err := r.db.ExecContext(ctx, "DELETE FROM task_tags WHERE tag_id = $1", id); err != nil {
 		return fmt.Errorf("failed to remove tag associations: %w", err)
 	}
 
-	// Затем удаляем сам тег
 	result, err := r.db.ExecContext(ctx, "DELETE FROM tags WHERE id = $1", id)
 	if err != nil {
 		return fmt.Errorf("failed to delete tag: %w", err)
@@ -161,14 +157,42 @@ func (r *TagRepo) AddTagToTask(ctx context.Context, taskID, tagID int, names []s
 	}
 	defer tx.Rollback()
 
+	var tagExists bool
+	err = tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM tags WHERE id = $1)", tagID).Scan(&tagExists)
+	if err != nil {
+		return fmt.Errorf("failed to check tag existence: %w", err)
+	}
+	if !tagExists {
+		return models.ErrTaskNotFound
+	}
+
+	var taskExists bool
+	err = tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM tasks WHERE id = $1)", taskID).Scan(&taskExists)
+	if err != nil {
+		return fmt.Errorf("failed to check task existence: %w", err)
+	}
+	if !taskExists {
+		return models.ErrTaskNotFound
+	}
+
 	query := `
-		INSERT INTO task_tags (task_id, tag_id) 
+		INSERT INTO
+			task_tags (task_id, tag_id) 
 		VALUES ($1, $2) 
-		ON CONFLICT DO NOTHING
+			ON CONFLICT DO NOTHING
 	`
 
-	if _, err := tx.ExecContext(ctx, query, taskID, tagID); err != nil {
+	result, err := tx.ExecContext(ctx, query, taskID, tagID)
+	if err != nil {
 		return fmt.Errorf("failed to add tag to task: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("task %d already has tag %d", taskID, tagID)
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -213,7 +237,9 @@ func (r *TagRepo) GetTaskTags(ctx context.Context, taskID int) ([]models.Tag, er
 		FROM 
 			tags t
 		JOIN 
-			task_tags tt ON t.id = tt.tag_id
+			task_tags tt
+		ON
+			t.id = tt.tag_id
 		WHERE
 			tt.task_id = $1
 	`
@@ -239,7 +265,6 @@ func (r *TagRepo) GetTaskTags(ctx context.Context, taskID int) ([]models.Tag, er
 		return nil, fmt.Errorf("error iterating tags: %w", err)
 	}
 
-	// Возвращаем пустой массив вместо null
 	if tags == nil {
 		tags = []models.Tag{}
 	}

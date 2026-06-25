@@ -33,7 +33,7 @@ func (s *Service) Create(ctx context.Context, task *models.CreateTaskRequest) (*
 		return nil, fmt.Errorf("%v", "task cannot be empty")
 	}
 
-	if task.DueDate.IsZero() {
+	if task.DueDate == "" {
 		return nil, fmt.Errorf("%v", "Due date is required")
 	}
 
