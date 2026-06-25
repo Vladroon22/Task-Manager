@@ -1,0 +1,772 @@
+basePath: /api/v1
+definitions:
+  github_com_Vladroon22_TaskTracker_internal_models.BadRequestResponse:
+    properties:
+      message:
+        example: Not found
+        type: string
+    type: object
+  github_com_Vladroon22_TaskTracker_internal_models.CreateTagRequest:
+    properties:
+      names:
+        items:
+          type: string
+        type: array
+    required:
+    - names
+    type: object
+  github_com_Vladroon22_TaskTracker_internal_models.CreateTaskPeriodRequest:
+    properties:
+      description:
+        type: string
+      due_date:
+        type: string
+      is_recurring:
+        type: boolean
+      recurrence_days:
+        items:
+          type: integer
+        type: array
+      recurrence_interval:
+        type: integer
+      recurrence_type:
+        type: string
+      status:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+    type: object
+  github_com_Vladroon22_TaskTracker_internal_models.CreateTaskRequest:
+    properties:
+      description:
+        type: string
+      due_date:
+        type: string
+      is_recurring:
+        type: boolean
+      recurrence_days:
+        items:
+          type: integer
+        type: array
+      recurrence_interval:
+        type: integer
+      recurrence_type:
+        type: string
+      status:
+        $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.TaskStatus'
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+    required:
+    - due_date
+    - title
+    type: object
+  github_com_Vladroon22_TaskTracker_internal_models.ErrorResponse:
+    properties:
+      message:
+        example: Invalid request body
+        type: string
+    type: object
+  github_com_Vladroon22_TaskTracker_internal_models.MessageResponse:
+    properties:
+      message:
+        example: Operation completed successfully
+        type: string
+    type: object
+  github_com_Vladroon22_TaskTracker_internal_models.ServerErrorResponse:
+    properties:
+      message:
+        example: Internal server error
+        type: string
+    type: object
+  github_com_Vladroon22_TaskTracker_internal_models.SetStatusRequest:
+    properties:
+      status:
+        example: done
+        type: string
+    type: object
+  github_com_Vladroon22_TaskTracker_internal_models.Tag:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      names:
+        items:
+          type: string
+        type: array
+      updated_at:
+        type: string
+    type: object
+  github_com_Vladroon22_TaskTracker_internal_models.Task:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      due_date:
+        type: string
+      id:
+        type: integer
+      is_recurring:
+        type: boolean
+      recurrence_days:
+        items:
+          type: integer
+        type: array
+      recurrence_interval:
+        type: integer
+      recurrence_type:
+        type: string
+      status:
+        $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.TaskStatus'
+      tags:
+        items:
+          $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.Tag'
+        type: array
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  github_com_Vladroon22_TaskTracker_internal_models.TaskListResponse:
+    properties:
+      tasks:
+        items:
+          $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.Task'
+        type: array
+    type: object
+  github_com_Vladroon22_TaskTracker_internal_models.TaskStatus:
+    enum:
+    - new
+    - in_progress
+    - done
+    - cancelled
+    type: string
+    x-enum-varnames:
+    - StatusNew
+    - StatusInProgress
+    - StatusDone
+    - StatusCancelled
+  github_com_Vladroon22_TaskTracker_internal_models.UpdateTaskRequest:
+    properties:
+      description:
+        type: string
+      due_date:
+        type: string
+      status:
+        $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.TaskStatus'
+      title:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@taskmanager.com
+    name: API Support
+  description: API для управления задачами и тегами
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: http://swagger.io/terms/
+  title: Task Manager API
+  version: "1.0"
+paths:
+  /tags:
+    get:
+      consumes:
+      - application/json
+      description: Получение списка всех тегов
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.Tag'
+            type: array
+        "400":
+          description: Некорректный ID задачи или формат даты
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.ErrorResponse'
+        "404":
+          description: Переопределение не найдено
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.BadRequestResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.ServerErrorResponse'
+      summary: Список тегов
+      tags:
+      - tags
+    post:
+      consumes:
+      - application/json
+      description: Создание нового тега
+      parameters:
+      - description: Данные тега
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.CreateTagRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.Tag'
+        "400":
+          description: Некорректный ID задачи или формат даты
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.ErrorResponse'
+        "404":
+          description: Переопределение не найдено
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.BadRequestResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.ServerErrorResponse'
+      summary: Создать тег
+      tags:
+      - tags
+  /tags/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Удаление тега по ID
+      parameters:
+      - description: ID тега
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.MessageResponse'
+        "400":
+          description: Некорректный ID задачи или формат даты
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.ErrorResponse'
+        "404":
+          description: Переопределение не найдено
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.BadRequestResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.ServerErrorResponse'
+      summary: Удалить тег
+      tags:
+      - tags
+    get:
+      consumes:
+      - application/json
+      description: Получение тега по идентификатору
+      parameters:
+      - description: ID тега
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.Tag'
+        "400":
+          description: Некорректный ID задачи или формат даты
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.ErrorResponse'
+        "404":
+          description: Переопределение не найдено
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.BadRequestResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.ServerErrorResponse'
+      summary: Получить тег по ID
+      tags:
+      - tags
+  /tasks:
+    get:
+      consumes:
+      - application/json
+      description: Получение списка задач с возможностью фильтрации и пагинации
+      parameters:
+      - description: Статус задачи (new, in_progress, done, cancelled)
+        in: query
+        name: status
+        type: string
+      - description: Дата начала периода (YYYY-MM-DD)
+        in: query
+        name: date_from
+        type: string
+      - description: Дата конца периода (YYYY-MM-DD)
+        in: query
+        name: date_to
+        type: string
+      - collectionFormat: csv
+        description: Теги для фильтрации
+        in: query
+        items:
+          type: string
+        name: tags
+        type: array
+      - default: 10
+        description: Лимит записей
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Смещение для пагинации
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.TaskListResponse'
+        "400":
+          description: Некорректный ID задачи или формат даты
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.ErrorResponse'
+        "404":
+          description: Переопределение не найдено
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.BadRequestResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.ServerErrorResponse'
+      summary: Список задач с фильтрацией
+      tags:
+      - tasks
+    post:
+      consumes:
+      - application/json
+      description: Создание новой задачи
+      parameters:
+      - description: Данные задачи
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.CreateTaskRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.Task'
+        "400":
+          description: Некорректный ID задачи или формат даты
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.ErrorResponse'
+        "404":
+          description: Переопределение не найдено
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.BadRequestResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.ServerErrorResponse'
+      summary: Создать задачу
+      tags:
+      - tasks
+  /tasks-period:
+    get:
+      consumes:
+      - application/json
+      description: Получение списка задач за указанный период
+      parameters:
+      - description: Начало периода (YYYY-MM-DD)
+        in: query
+        name: from
+        required: true
+        type: string
+      - description: Конец периода (YYYY-MM-DD)
+        in: query
+        name: to
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.TaskListResponse'
+        "400":
+          description: Некорректный ID задачи или формат даты
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.ErrorResponse'
+        "404":
+          description: Переопределение не найдено
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.BadRequestResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.ServerErrorResponse'
+      summary: Получить задачи за период
+      tags:
+      - tasks-period
+    post:
+      consumes:
+      - application/json
+      description: Создание задачи с указанием периода выполнения
+      parameters:
+      - description: Данные задачи с периодом
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.CreateTaskPeriodRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.Task'
+        "400":
+          description: Некорректный ID задачи или формат даты
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.ErrorResponse'
+        "404":
+          description: Переопределение не найдено
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.BadRequestResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.ServerErrorResponse'
+      summary: Создать задачу с периодом
+      tags:
+      - tasks-period
+  /tasks-period/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Удаление переопределения статуса задачи на конкретную дату
+      parameters:
+      - description: ID задачи
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Дата переопределения (YYYY-MM-DD)
+        in: query
+        name: date
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.MessageResponse'
+        "400":
+          description: Некорректный ID задачи или формат даты
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.ErrorResponse'
+        "404":
+          description: Переопределение не найдено
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.BadRequestResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.ServerErrorResponse'
+      summary: Удалить переопределение статуса задачи
+      tags:
+      - tasks-period
+    put:
+      consumes:
+      - application/json
+      description: Установка статуса задачи на конкретную дату
+      parameters:
+      - description: ID задачи
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Дата (YYYY-MM-DD)
+        in: query
+        name: date
+        required: true
+        type: string
+      - description: Статус задачи
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.SetStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.MessageResponse'
+        "400":
+          description: Некорректный ID задачи или формат даты
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.ErrorResponse'
+        "404":
+          description: Переопределение не найдено
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.BadRequestResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.ServerErrorResponse'
+      summary: Установить статус задачи на дату
+      tags:
+      - tasks-period
+  /tasks/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Удаление задачи по ID
+      parameters:
+      - description: ID задачи
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.MessageResponse'
+        "404":
+          description: Переопределение не найдено
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.BadRequestResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.ServerErrorResponse'
+      summary: Удалить задачу
+      tags:
+      - tasks
+    get:
+      consumes:
+      - application/json
+      description: Получение задачи по идентификатору
+      parameters:
+      - description: ID задачи
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.Task'
+        "400":
+          description: Некорректный ID задачи или формат даты
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.ErrorResponse'
+        "404":
+          description: Переопределение не найдено
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.BadRequestResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.ServerErrorResponse'
+      summary: Получить задачу по ID
+      tags:
+      - tasks
+    put:
+      consumes:
+      - application/json
+      description: Обновление существующей задачи
+      parameters:
+      - description: ID задачи
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Обновленные данные задачи
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.UpdateTaskRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.Task'
+        "400":
+          description: Некорректный ID задачи или формат даты
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.ErrorResponse'
+        "404":
+          description: Переопределение не найдено
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.BadRequestResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.ServerErrorResponse'
+      summary: Обновить задачу
+      tags:
+      - tasks
+  /tasks/{taskId}/tags:
+    get:
+      consumes:
+      - application/json
+      description: Получение списка тегов, привязанных к задаче
+      parameters:
+      - description: ID задачи
+        in: path
+        name: taskId
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.Tag'
+            type: array
+        "400":
+          description: Некорректный ID задачи или формат даты
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.ErrorResponse'
+        "404":
+          description: Переопределение не найдено
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.BadRequestResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.ServerErrorResponse'
+      summary: Получить теги задачи
+      tags:
+      - tags
+  /tasks/{taskId}/tags/{tagId}:
+    delete:
+      consumes:
+      - application/json
+      description: Отвязка тега от задачи
+      parameters:
+      - description: ID задачи
+        in: path
+        name: taskId
+        required: true
+        type: integer
+      - description: ID тега
+        in: path
+        name: tagId
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.MessageResponse'
+        "400":
+          description: Некорректный ID задачи или формат даты
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.ErrorResponse'
+        "404":
+          description: Переопределение не найдено
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.BadRequestResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.ServerErrorResponse'
+      summary: Удалить тег из задачи
+      tags:
+      - tags
+    post:
+      consumes:
+      - application/json
+      description: Привязка тега к задаче
+      parameters:
+      - description: ID задачи
+        in: path
+        name: taskId
+        required: true
+        type: integer
+      - description: ID тега
+        in: path
+        name: tagId
+        required: true
+        type: integer
+      - description: Данные тега (опционально)
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.CreateTagRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.MessageResponse'
+        "400":
+          description: Некорректный ID задачи или формат даты
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.ErrorResponse'
+        "404":
+          description: Переопределение не найдено
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.BadRequestResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/github_com_Vladroon22_TaskTracker_internal_models.ServerErrorResponse'
+      summary: Добавить тег к задаче
+      tags:
+      - tags
+swagger: "2.0"
+tags:
+- description: Управление задачами
+  name: tasks
+- description: Управление тегами
+  name: tags
+- description: Задачи с периодами выполнения
+  name: tasks-period
